@@ -1,0 +1,4 @@
+[submodule "upstream/sbuga"]
+	path = upstream/sbuga
+	url = https://github.com/Sbotga/sbuga-sonolus-server.git
+	branch = main
