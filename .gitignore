@@ -3,3 +3,13 @@ dist/
 pack/
 .env
 *.log
+*.tsbuildinfo
+
+# Python tooling
+__pycache__/
+.venv/
+
+# Local importer input and comparison files
+imports/
+source/
+!/source/info.json

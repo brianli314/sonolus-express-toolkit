@@ -1,7 +1,7 @@
 import express from 'express'
 import { Sonolus } from '@sonolus/express'
 
-const port = Number(process.env.PORT ?? 3000)
+const port = 3000
 
 const sonolus = new Sonolus()
 sonolus.load('./pack')
@@ -14,6 +14,6 @@ app.get('/health', (_req, res) => {
 
 app.use(sonolus.router)
 
-app.listen(port, '0.0.0.0', () => {
+app.listen(port, () => {
     console.log(`Sonolus server listening on port ${port}`)
 })
