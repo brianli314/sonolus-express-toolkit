@@ -1,5 +1,5 @@
 # Sonolus Express Toolkit
-Python toolkit for setting up a server with Sonolus Express. Includes importing and configuring levels, and engine setup with various methods.
+Python toolkit for setting up a server using [Sonolus Express](https://github.com/Sonolus/sonolus-express). Includes importing and configuring levels, and engine setup with various methods.
 
 # Documentation
 
