@@ -1,5 +1,8 @@
 {
   "title": {
-    "en": "Personal Sonolus Server"
+    "en": "Sonolus Express"
+  },
+  "description": {
+    "en": "Sonolus Express server"
   }
 }

@@ -8,7 +8,6 @@ import hashlib
 import json
 import re
 import shutil
-import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,8 +25,12 @@ from import_utils import (
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 IMPORT_DIR = PROJECT_ROOT / "imports"
 SOURCE_DIR = PROJECT_ROOT / "source"
+EXTRACTIONS_DIR = PROJECT_ROOT / "extractions"
 ENGINE_NAME = "next-rush-sbuga"
 LOCALE = "en"
+BACKGROUND_MASK = json.loads(
+    Path(__file__).with_name("import_settings.json").read_text(encoding="utf-8")
+)["backgroundMask"]
 
 
 @dataclass
@@ -66,6 +69,11 @@ def parse_args() -> argparse.Namespace:
         default=LOCALE,
         help="Locale used for plain-text metadata.",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Refresh existing levels with the same original name.",
+    )
     return parser.parse_args()
 
 
@@ -100,8 +108,9 @@ def main() -> None:
 
     for scp_path in scp_paths:
         stats.packages += 1
-        with tempfile.TemporaryDirectory(prefix="sonolus-pack-scp-") as temporary_dir:
-            package_root = extract_scp(scp_path, Path(temporary_dir))
+        extraction_path = EXTRACTIONS_DIR / scp_path.stem
+        try:
+            package_root = extract_scp(scp_path, EXTRACTIONS_DIR)
             package_stats = export_package(
                 package_root=package_root,
                 levels_dir=levels_dir,
@@ -109,7 +118,10 @@ def main() -> None:
                 backgrounds_dir=backgrounds_dir,
                 engine_name=args.engine,
                 locale=args.locale,
+                force=args.force,
             )
+        finally:
+            shutil.rmtree(extraction_path, ignore_errors=True)
         merge_stats(stats, package_stats)
 
     print()
@@ -130,7 +142,7 @@ def main() -> None:
 
 def extract_scp(scp_path: Path, extract_dir: Path) -> Path:
     target = extract_dir / scp_path.stem
-    target.mkdir(parents=True)
+    replace_directory(target)
 
     try:
         with zipfile.ZipFile(scp_path) as archive:
@@ -169,6 +181,7 @@ def export_package(
     backgrounds_dir: Path,
     engine_name: str,
     locale: str,
+    force: bool = False,
 ) -> ImportStats:
     stats = ImportStats()
     collection = collect_level_collection(package_root)
@@ -246,10 +259,13 @@ def export_package(
                 and duplicate_metadata.get("bgmHash") == bgm_hash
             )
 
-            if same_original_name and not same_content:
+            if same_original_name and (force or not same_content):
                 output_dir = duplicate_dir
                 is_update = True
-                print(f"Updating {item_name} in {output_dir}")
+                reason = (
+                    "forced refresh" if force and same_content else "changed content"
+                )
+                print(f"Updating {item_name} in {output_dir} ({reason})")
             else:
                 item_to_level_name[item_name] = duplicate_dir.name
                 set_level_background(duplicate_dir / "item.json", background_name)
@@ -419,9 +435,8 @@ def ensure_generated_background(
     if cover_hash in cache:
         return cache[cover_hash], False
 
-    for filename in ("data", "configuration"):
-        if not (template_dir / filename).is_file():
-            raise FileNotFoundError(f"Background template is missing {filename}")
+    if not (template_dir / "data").is_file():
+        raise FileNotFoundError("Background template is missing data")
 
     background_name = f"pjsk-generated-{cover_hash[:16]}-v3"
     output_dir = backgrounds_dir / background_name
@@ -429,7 +444,9 @@ def ensure_generated_background(
         "generator": "pjsk_background_gen_PIL",
         "version": "v3",
         "coverHash": cover_hash,
-        "renderRevision": "center-crop-2048x1168",
+        "renderRevision": (
+            f"center-crop-2048x1168-mask-{BACKGROUND_MASK.removeprefix('#')}"
+        ),
     }
 
     if generated_background_matches(output_dir, expected_meta):
@@ -459,7 +476,13 @@ def ensure_generated_background(
     # processed Sonolus image, so keep it extensionless.
     shutil.copy2(cover_path, output_dir / "thumbnail")
     shutil.copy2(template_dir / "data", output_dir / "data")
-    shutil.copy2(template_dir / "configuration", output_dir / "configuration")
+    configuration = json.dumps(
+        {"scope": "Sekai", "blur": 0, "mask": BACKGROUND_MASK},
+        separators=(",", ":"),
+    ).encode()
+    (output_dir / "configuration").write_bytes(
+        gzip.compress(configuration, mtime=0)
+    )
 
     write_json(
         output_dir / "item.json",

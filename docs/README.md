@@ -1,4 +1,7 @@
-# Project Documentation
+# Sonolus Express Toolkit
+Python toolkit for setting up a server with Sonolus Express. Includes importing and configuring levels, and engine setup with various methods.
+
+# Documentation
 
 - [Repository and server](repository-and-server.md): architecture, catalogue
   layout, generated files, TypeScript, and Caddy.

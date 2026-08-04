@@ -20,7 +20,6 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import tempfile
 import zipfile
 from pathlib import Path
 from typing import Any, Iterator, Optional
@@ -32,6 +31,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 REFERENCE_SCP = PROJECT_ROOT / "imports" / "reference.scp"
 SOURCE_ROOT = PROJECT_ROOT / "source"
+EXTRACTIONS_DIR = PROJECT_ROOT / "extractions"
 LOCALE = "en"
 
 
@@ -83,8 +83,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    with tempfile.TemporaryDirectory(prefix="sonolus-scp-import-") as temp_dir:
-        package_root = extract_scp(args.scp.resolve(), Path(temp_dir))
+    scp_path = args.scp.resolve()
+    extraction_path = EXTRACTIONS_DIR / scp_path.stem
+    try:
+        package_root = extract_scp(scp_path, EXTRACTIONS_DIR)
         import_engine_bundle(
             package_root=package_root,
             source_root=SOURCE_ROOT,
@@ -92,6 +94,8 @@ def main() -> None:
             locale=args.locale,
             engine_name_override=args.engine_name,
         )
+    finally:
+        shutil.rmtree(extraction_path, ignore_errors=True)
 
 
 def import_engine_bundle(
@@ -238,7 +242,7 @@ def make_pack_item(item: dict[str, Any], locale: str) -> dict[str, Any]:
 
 def extract_scp(scp_path: Path, extract_dir: Path) -> Path:
     target = extract_dir / scp_path.stem
-    target.mkdir(parents=True)
+    replace_directory(target)
 
     with zipfile.ZipFile(scp_path) as archive:
         safe_extract(archive, target)
