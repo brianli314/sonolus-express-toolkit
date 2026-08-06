@@ -12,10 +12,10 @@ scripts/.venv/bin/pip install -r scripts/requirements.txt
 Every executable importer supports `--help`. `import_utils.py` is a shared module
 and is not run directly.
 
-## Import the SBUga engine (inside git module)
+## Import the Sbuga engine
 
 This imports Next RUSH plus its default skin, background, effect, particle,
-configuration, all engine modes, and optional ROM, using the engine data from the [Sbuga engine](https://github.com/Sbotga/sbuga-sonolus-server). It also records the pinned
+configuration, all engine modes, and optional ROM, using the engine data from the [Sbuga engine](https://github.com/Sbotga/sbuga-sonolus-server), a submodule contained within this repository. It also records the pinned
 SBUga commit. If the engine name changes, pass the same name to level importers
 with `--engine`.
 
