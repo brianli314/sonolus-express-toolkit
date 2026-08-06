@@ -88,12 +88,17 @@ def main() -> None:
     cover_path = find_asset(directory, "jacket")
     preview_path = find_asset(directory, "preview", required=False)
     output_names = make_output_names(base_name, charts)
+    playlist_dir = (
+        SOURCE_DIR / "playlists" / base_name if len(charts) > 1 else None
+    )
 
     existing = [
         SOURCE_DIR / "levels" / name
         for name in output_names.values()
         if (SOURCE_DIR / "levels" / name).exists()
     ]
+    if playlist_dir and playlist_dir.exists():
+        existing.append(playlist_dir)
     if existing and not args.force:
         paths = "\n".join(f"  {path}" for path in existing)
         raise SystemExit(
@@ -145,6 +150,18 @@ def main() -> None:
         )
         print(f"Imported {chart.name} -> {output_dir}")
 
+    if playlist_dir:
+        write_playlist(
+            playlist_dir,
+            item=item,
+            name=base_name,
+            levels=list(output_names.values()),
+            cover_path=cover_path,
+            locale=args.locale,
+            pjsk=pjsk,
+        )
+        print(f"Created playlist -> {playlist_dir}")
+
     print(f"Imported {len(charts)} level(s) from {directory}.")
 
 
@@ -160,7 +177,15 @@ def find_charts(directory: Path) -> list[Path]:
         raise SystemExit(
             f"No .sus, .usc, or *NSLevelData.json.gz files found in {directory}"
         )
-    return charts
+    return sorted(
+        charts,
+        key=lambda chart: (
+            DIFFICULTIES.index(chart_label(chart))
+            if chart_label(chart) in DIFFICULTIES
+            else len(DIFFICULTIES),
+            chart.name,
+        ),
+    )
 
 
 def find_asset(directory: Path, stem: str, *, required: bool = True) -> Path | None:
@@ -409,6 +434,42 @@ def build_level_item(
     if description:
         result["description"] = localize(description, locale)
     return result
+
+
+def write_playlist(
+    output_dir: Path,
+    *,
+    item: dict[str, Any],
+    name: str,
+    levels: list[str],
+    cover_path: Path,
+    locale: str,
+    pjsk: dict[str, Any] | None,
+) -> None:
+    output_dir = replace_directory(output_dir)
+    shutil.copy2(cover_path, output_dir / "thumbnail")
+    write_json(
+        output_dir / "item.json",
+        {
+            "version": item.get("version", 1),
+            "title": localize(item.get("title") or name, locale),
+            "time": 0,
+            "author": localize(
+                item.get("author")
+                or ("Project Sekai: Colorful Stage!" if pjsk else ""),
+                locale,
+            ),
+            "tags": normalize_tags(item.get("tags", []), locale),
+            "levels": levels,
+            "meta": {
+                "importer": "chart-bundle",
+                "originalName": name,
+                "source": item.get("source")
+                or ("https://sekai.best" if pjsk else None),
+                **(pjsk or {}),
+            },
+        },
+    )
 
 
 if __name__ == "__main__":

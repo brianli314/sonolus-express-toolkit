@@ -94,6 +94,8 @@ the bundle name, so `master.sus` becomes `...-master`. Same-named SUS and USC
 files also get a format suffix to avoid collisions. A lone
 `NSLevelData.json.gz` keeps the name from `level.json` or the directory name;
 names such as `master.NSLevelData.json.gz` use `master` as their suffix.
+When a bundle contains multiple charts, the importer also creates a playlist
+with the bundle's title and jacket containing all of those levels.
 
 `level.json` supplies normal Sonolus metadata. It may also contain a `ratings`
 object keyed by chart filename, such as `{"master": 31}`. For official PJSK
