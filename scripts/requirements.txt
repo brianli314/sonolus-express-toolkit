@@ -1,2 +1,4 @@
 git+https://github.com/UntitledCharts/pjsekai-background-gen-pillow-upd
 git+https://github.com/UntitledCharts/sonolus-level-converters
+pydub
+audioop-lts

@@ -16,3 +16,4 @@ references/
 source/
 !/source/info.json
 */banner.png
+ffmpeg/

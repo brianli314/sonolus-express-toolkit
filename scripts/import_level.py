@@ -5,9 +5,10 @@ from pathlib import Path
 import argparse
 import json
 from utils import *
-import pjsk_background_gen_PIL
-from utils import localize
+from utils import localize, generate_background
 import shutil
+import time
+
 
 PARENT = Path(__file__).parents[1]
 EXTRACTED = PARENT / "extractions"
@@ -15,14 +16,14 @@ ENGINE = "next-rush-sbuga"
 IMPORT_DIR = PARENT / "imports"
 LEVELS_DIR = PARENT / "source" / "levels"
 PLAYLIST_DIR = PARENT / "source" / "playlists"
-BACKGROUNDS_DIR = PARENT / "source" / "backgrounds"
 
 DIRECT = ["version", "rating", "useSkin", "useParticle", "useEffect"]
 LOCALIZE = ["title", "artists", "author", "description", "tags"]
 
+SORT = ["easy", "normal", "hard", "expert", "master", "append"]
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Import the pinned SBUga engine.")
+    parser = argparse.ArgumentParser(description="Import a level from a scp")
     parser.add_argument(
         "--engine",
         default=ENGINE,
@@ -61,90 +62,78 @@ def write_level_json(data, args):
     }
     return out
 
-def write_playlist_json(data, args):
+def write_playlist_json(data, level_names, locale):
     out = {}
     out["version"] = data["version"]
-    out["title"] = localize(data["title"], args.locale)
+    out["title"] = localize(data["title"], locale)
     out["time"] = data.get("time", 0)
-    out["author"] = localize(data["author"], args.locale)
-    out["tags"] = localize(data["tags"], args.locale)
+    out["author"] = localize(data["author"], locale)
+    out["tags"] = localize(data["tags"], locale)
 
     if data.get("subtitle"):
-        out["subtitle"] = localize(data["subtitle"], args.locale)
+        out["subtitle"] = localize(data["subtitle"], locale)
     else:
-        out["subtitle"] = localize("", args.locale)
+        out["subtitle"] = localize("", locale)
 
-    out["levels"] = [level.get("name") for level in data["levels"]]
-    import_levels(data["levels"], args)
+    out["levels"] = level_names
     return out
-
-def generate_background(cover_path, name):
-    bg_dir = BACKGROUNDS_DIR / f"{name}-v3-bg"
-    os.makedirs(bg_dir, exist_ok=True)
-
-    with Image.open(cover_path) as im:
-        im = im.convert("RGBA")
-        rendered = pjsk_background_gen_PIL.render_v3(im)
-        rendered = rendered.crop((0, 440, 2048, 1608))
-        rendered.save(bg_dir / "image.png", format="PNG")
-
-    shutil.copy2(PARENT / "background_templates" / "data", bg_dir / "data")
-    shutil.copy2(cover_path, bg_dir / "thumbnail")
-    shutil.copy2(PARENT / "background_templates" / "configuration", bg_dir / "configuration")
-
-    item = {
-        "version": 2, 
-        "title": {
-            "en": name
-        },
-        "subtitle": {
-            "en": f"Generated background for {name}"
-        },
-        "author": {
-            "en": f"Untitled Charts Generator"
-        },
-        "tags": [],
-    }
-    with open(bg_dir / "item.json", 'w') as f:
-        json.dump(item, f, indent=4)
-    
     
 
 def import_levels(items, args):
+    level_names = []
     for item in items:
         name = item["name"]
-        if name in os.listdir(LEVELS_DIR):
+        exist = False
+        for lvl in os.listdir(LEVELS_DIR):
+            if lvl.endswith(name):
+                exist = True
+                break
+        if exist:
             print(f"Skipping {name}: already exists")
             continue
-        os.mkdir(LEVELS_DIR / name)
 
-        shutil.copy2(EXTRACTED / item["cover"]["url"].lstrip("/"), LEVELS_DIR / name / "cover")
-        shutil.copy2(EXTRACTED / item["bgm"]["url"].lstrip("/"), LEVELS_DIR / name / "bgm")
-        shutil.copy2(EXTRACTED / item["data"]["url"].lstrip("/"), LEVELS_DIR / name / "data")
+        tstamp = f"{10_000_000_000 - time.time()}-{name}"
+        directory = LEVELS_DIR / tstamp
+        os.mkdir(directory)
+
+        shutil.copy2(EXTRACTED / item["cover"]["url"].lstrip("/"), directory / "cover")
+        shutil.copy2(EXTRACTED / item["bgm"]["url"].lstrip("/"), directory / "bgm")
+        shutil.copy2(EXTRACTED / item["data"]["url"].lstrip("/"), directory / "data")
             
         if item.get("preview"):
-            shutil.copy2(EXTRACTED / item["preview"]["url"].lstrip("/"), LEVELS_DIR / name / "preview")
+            shutil.copy2(EXTRACTED / item["preview"]["url"].lstrip("/"), directory / "preview")
 
         info = write_level_json(item, args)
-        with open(LEVELS_DIR / name / "item.json", 'w') as f:
+        with open(directory / "item.json", 'w') as f:
             json.dump(info, f, indent=4)
 
-        generate_background(LEVELS_DIR / name / "cover", name)
+        generate_background(directory / "cover", name)
+        level_names.append(tstamp)
         print(f"Created level {name}")
+    return level_names
 
 
 def import_playlists(items, args):
     for item in items:
         name = item["name"]
-        if name in os.listdir(PLAYLIST_DIR):
+        exist = False
+        for lvl in os.listdir(PLAYLIST_DIR):
+            if lvl.endswith(name):
+                exist = True
+                break
+        if exist:
             print(f"Skipping {name}: already exists")
             continue
-        os.mkdir(PLAYLIST_DIR / name)
 
-        shutil.copy2(EXTRACTED / item["thumbnail"]["url"].lstrip("/"), PLAYLIST_DIR / name / "thumbnail")
+        directory = PLAYLIST_DIR / f"{10_000_000_000 - time.time()}-{name}"
+        os.mkdir(directory)
 
-        info = write_playlist_json(item, args)
-        with open(PLAYLIST_DIR  / name / "item.json", 'w') as f:
+        shutil.copy2(EXTRACTED / item["thumbnail"]["url"].lstrip("/"), directory / "thumbnail")
+
+        level_names = import_levels(list(reversed(item["levels"])), args)
+
+        info = write_playlist_json(item, list(reversed(level_names)), args.locale)
+        with open(directory / "item.json", 'w') as f:
             json.dump(info, f, indent=4)
 
         print(f"Created playlist {name}")
@@ -154,19 +143,18 @@ def main():
     args = parse_args()
     LEVELS_DIR.mkdir(exist_ok=True)
     PLAYLIST_DIR.mkdir(exist_ok=True)
-    BACKGROUNDS_DIR.mkdir(exist_ok=True)
     imports = os.listdir(args.import_dir)
+
     if not imports:
         print("No SCPs found")
         return
+    
     for imp in imports:
         if not imp.endswith(".scp"):
             print(f"File {imp} not an SCP")
             continue
 
         extract_scp(args.import_dir / imp, PARENT / "extractions")
-
-
 
         levels = EXTRACTED / "sonolus" / "levels"
         with open(levels / "list") as f:
