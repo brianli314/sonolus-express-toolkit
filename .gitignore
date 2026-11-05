@@ -17,3 +17,5 @@ source/
 !/source/info.json
 */banner.png
 ffmpeg/
+songs.txt
+*.scp

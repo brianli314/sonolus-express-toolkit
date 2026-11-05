@@ -119,8 +119,12 @@ def copy_folder(folder, data_type, name, locale):
                 json.dump(data, f, indent=4)
                 
         else:
-            os.makedirs(SOURCE / data_type / name, exist_ok=True) 
-            shutil.copy2(folder / item, SOURCE / data_type / name / item)
+            os.makedirs(SOURCE / data_type / name, exist_ok=True)
+            out_item = item
+            if item.endswith(".json.gz"):
+                out_item = item.removesuffix(".json.gz")
+                print(f"Removed suffix of {item}")
+            shutil.copy2(folder / item, SOURCE / data_type / name / out_item)
 
 def copy_engine(engine, name, locale):
     for item in os.listdir(engine):
@@ -195,7 +199,6 @@ def main():
     copy_folder(effect_source, "effects", effect_name, args.locale)
     copy_folder(particle_source, "particles", particle_name, args.locale)
 
-    print()
     print(f"Imported engine: {args.reference_name} -> {args.engine_name}")
     print(f"Default skin:    {skin_name}")
     print(f"Background:      {background_name}")

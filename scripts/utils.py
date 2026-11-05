@@ -39,6 +39,7 @@ def generate_background(cover_path, name):
         im = im.convert("RGBA")
         rendered = pjsk_background_gen_PIL.render_v3(im)
         rendered = rendered.crop((0, 440, 2048, 1608))
+        rendered = zoom(rendered, factor=1.2,)
         rendered.save(bg_dir / "image.png", format="PNG")
 
     shutil.copy2(PARENT / "background_templates" / "data", bg_dir / "data")
@@ -60,4 +61,17 @@ def generate_background(cover_path, name):
     }
     with open(bg_dir / "item.json", 'w') as f:
         json.dump(item, f, indent=4)
-    
+
+
+def zoom(img, factor=2.0, center=None):
+    w, h = img.size
+    cx, cy = center if center else (w / 2, h / 2)
+    new_w, new_h = w / factor, h / factor
+
+    left = max(0, cx - new_w / 2)
+    top = max(0, cy - new_h / 2)
+    right = min(w, left + new_w)
+    bottom = min(h, top + new_h)
+
+    cropped = img.crop((int(left), int(top), int(right), int(bottom)))
+    return cropped.resize((w, h), Image.LANCZOS)  # scale back to original size

@@ -60,9 +60,12 @@ def write_level_json(data, args):
         "useDefault": False,
         "item": f"{data["name"]}-v3-bg"
     }
+    out["meta"] = {
+        "addedAt": time.time()
+    }
     return out
 
-def write_playlist_json(data, level_names, locale):
+def write_playlist_json(data, locale):
     out = {}
     out["version"] = data["version"]
     out["title"] = localize(data["title"], locale)
@@ -75,25 +78,22 @@ def write_playlist_json(data, level_names, locale):
     else:
         out["subtitle"] = localize("", locale)
 
-    out["levels"] = level_names
+    out["levels"] = [level["name"] for level in data["levels"]]
+    out["meta"] = {
+        "addedAt": time.time()
+    }
     return out
     
 
 def import_levels(items, args):
-    level_names = []
     for item in items:
         name = item["name"]
-        exist = False
-        for lvl in os.listdir(LEVELS_DIR):
-            if lvl.endswith(name):
-                exist = True
-                break
-        if exist:
+
+        if name in os.listdir(LEVELS_DIR):
             print(f"Skipping {name}: already exists")
             continue
 
-        tstamp = f"{10_000_000_000 - time.time()}-{name}"
-        directory = LEVELS_DIR / tstamp
+        directory = LEVELS_DIR / name
         os.mkdir(directory)
 
         shutil.copy2(EXTRACTED / item["cover"]["url"].lstrip("/"), directory / "cover")
@@ -108,31 +108,25 @@ def import_levels(items, args):
             json.dump(info, f, indent=4)
 
         generate_background(directory / "cover", name)
-        level_names.append(tstamp)
         print(f"Created level {name}")
-    return level_names
 
 
 def import_playlists(items, args):
     for item in items:
         name = item["name"]
-        exist = False
-        for lvl in os.listdir(PLAYLIST_DIR):
-            if lvl.endswith(name):
-                exist = True
-                break
-        if exist:
+
+        if name in os.listdir(PLAYLIST_DIR):
             print(f"Skipping {name}: already exists")
             continue
 
-        directory = PLAYLIST_DIR / f"{10_000_000_000 - time.time()}-{name}"
+        directory = PLAYLIST_DIR / name
         os.mkdir(directory)
 
         shutil.copy2(EXTRACTED / item["thumbnail"]["url"].lstrip("/"), directory / "thumbnail")
 
-        level_names = import_levels(list(reversed(item["levels"])), args)
+        import_levels(list(reversed(item["levels"])), args)
 
-        info = write_playlist_json(item, list(reversed(level_names)), args.locale)
+        info = write_playlist_json(item, args.locale)
         with open(directory / "item.json", 'w') as f:
             json.dump(info, f, indent=4)
 
